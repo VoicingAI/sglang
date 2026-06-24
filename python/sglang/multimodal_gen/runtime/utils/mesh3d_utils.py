@@ -1004,6 +1004,11 @@ class ImageProcessorV2:
 
     def load_image(self, image, border_ratio=0.15, to_tensor=True):
         if isinstance(image, str):
+            from sglang.multimodal_gen.runtime.models.vision_utils import (
+                check_local_media_path_allowed,
+            )
+
+            check_local_media_path_allowed(image)
             image = cv2.imread(image, cv2.IMREAD_UNCHANGED)
             image, mask = self.recenter(image, border_ratio=border_ratio)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

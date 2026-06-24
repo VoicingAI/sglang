@@ -341,6 +341,11 @@ class DiffusersExecutionStage(PipelineStage):
                 response = requests.get(batch.image_path, timeout=30)
                 response.raise_for_status()
                 return Image.open(BytesIO(response.content)).convert("RGB")
+            from sglang.multimodal_gen.runtime.models.vision_utils import (
+                check_local_media_path_allowed,
+            )
+
+            check_local_media_path_allowed(batch.image_path)
             return Image.open(batch.image_path).convert("RGB")
         except Exception as e:
             logger.error("Failed to load image from %s: %s", batch.image_path, e)

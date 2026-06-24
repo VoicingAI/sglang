@@ -369,8 +369,12 @@ class Hunyuan3DPaintPreprocessStage(PipelineStage):
     def _do_delight(self, batch: Req, server_args: ServerArgs) -> Req:
         from PIL import Image
 
+        from sglang.multimodal_gen.runtime.models.vision_utils import (
+            check_local_media_path_allowed,
+        )
         from sglang.multimodal_gen.runtime.utils.mesh3d_utils import recenter_image
 
+        check_local_media_path_allowed(batch.image_path)
         image = Image.open(batch.image_path)
         image = recenter_image(image)
 

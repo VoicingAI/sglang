@@ -87,6 +87,26 @@ def normalize(images: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
     return 2.0 * images - 1.0
 
 
+def check_local_media_path_allowed(ref: str) -> None:
+    """Block loading diffusion inputs from local filesystem paths unless allowed.
+
+    Diffusion media inputs (``image_path`` / ``image_url``) can be untrusted
+    client request data, so reading arbitrary local paths is an unauthenticated
+    path-traversal / arbitrary file read primitive (GHSA-qwrp-wghp-94q2). Local
+    file access is disabled unless ``SGLANG_ALLOW_LOCAL_MEDIA_PATH`` is set;
+    enable it only for trusted local/CLI usage.
+    """
+    from sglang.srt.environ import envs
+
+    if not envs.SGLANG_ALLOW_LOCAL_MEDIA_PATH.get():
+        raise ValueError(
+            "Loading diffusion inputs from a local file path is disabled for "
+            "security reasons (path traversal). Provide an http(s) URL, or set "
+            "SGLANG_ALLOW_LOCAL_MEDIA_PATH=1 to allow local file access on a "
+            "trusted host (e.g. local CLI usage)."
+        )
+
+
 # adapted from diffusers.utils import load_image
 def load_image(
     image: str | PIL.Image.Image,
@@ -106,6 +126,7 @@ def load_image(
         if image.startswith("http://") or image.startswith("https://"):
             image = PIL.Image.open(requests.get(image, stream=True).raw)
         elif os.path.isfile(image):
+            check_local_media_path_allowed(image)
             image = PIL.Image.open(image)
         else:
             raise ValueError(
@@ -155,6 +176,9 @@ def load_video(
         raise ValueError(
             f"Incorrect path or URL. URLs must start with `http://` or `https://`, and {video} is not a valid path."
         )
+
+    if is_file and not is_url:
+        check_local_media_path_allowed(video)
 
     if is_url:
         response = requests.get(video, stream=True)
