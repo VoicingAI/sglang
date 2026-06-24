@@ -690,6 +690,25 @@ def set_random_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def _check_local_media_path_allowed(ref: str) -> None:
+    """Guard against unauthenticated path traversal / arbitrary file read.
+
+    Multimodal inputs may arrive as untrusted client-supplied strings. Reading
+    local filesystem paths (bare paths or ``file://`` URLs) from such input lets
+    an attacker exfiltrate arbitrary files (GHSA-qwrp-wghp-94q2). Local file
+    access is therefore disabled unless ``SGLANG_ALLOW_LOCAL_MEDIA_PATH`` is set.
+    """
+    from sglang.srt.environ import envs
+
+    if not envs.SGLANG_ALLOW_LOCAL_MEDIA_PATH.get():
+        raise ValueError(
+            "Loading multimodal data from a local file path is disabled for "
+            "security reasons (path traversal). Provide the data as an http(s) "
+            "URL, a data: URI, or a base64 string. To allow local file access "
+            "(only on a fully trusted network), set SGLANG_ALLOW_LOCAL_MEDIA_PATH=1."
+        )
+
+
 def load_audio(
     audio_file: str, sr: Optional[int] = None, mono: bool = True
 ) -> np.ndarray:
@@ -709,8 +728,10 @@ def load_audio(
             response.raise_for_status()
             source = response.content
     elif isinstance(audio_file, str) and audio_file.startswith("file://"):
+        _check_local_media_path_allowed(audio_file)
         source = unquote(urlparse(audio_file).path)
     elif isinstance(audio_file, str):
+        _check_local_media_path_allowed(audio_file)
         source = audio_file
     else:
         raise ValueError(f"Invalid audio format: {audio_file}")
@@ -860,6 +881,7 @@ def get_image_bytes(image_file: Union[str, bytes]) -> bytes:
             response.close()
         return result
     if image_file.startswith(("file://", "/")):
+        _check_local_media_path_allowed(image_file)
         with open(image_file, "rb") as f:
             return f.read()
     if isinstance(image_file, str) and image_file.startswith("data:"):
@@ -891,8 +913,10 @@ def _normalize_video_input(
             _, encoded = video_file.split(",", 1)
             return pybase64.b64decode(encoded, validate=True)
         elif video_file.startswith("file://"):
+            _check_local_media_path_allowed(video_file)
             return unquote(urlparse(video_file).path)
         elif os.path.isfile(unquote(urlparse(video_file).path)):
+            _check_local_media_path_allowed(video_file)
             return video_file
         else:
             return pybase64.b64decode(video_file, validate=True)

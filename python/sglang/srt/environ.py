@@ -465,6 +465,11 @@ class Envs:
     SGLANG_MM_PRECOMPUTE_HASH = EnvBool(False)
     SGLANG_VIT_ENABLE_CUDA_GRAPH = EnvBool(False)
     SGLANG_MM_SKIP_COMPUTE_HASH = EnvBool(False)
+    # Security: allow multimodal inputs to be loaded from local filesystem paths
+    # (bare paths or file:// URLs). Disabled by default to prevent unauthenticated
+    # path traversal / arbitrary file read (GHSA-qwrp-wghp-94q2). When disabled,
+    # only http(s) URLs, data: URIs, and base64 payloads are accepted.
+    SGLANG_ALLOW_LOCAL_MEDIA_PATH = EnvBool(False)
 
 
     # VLM Item CUDA IPC Transport

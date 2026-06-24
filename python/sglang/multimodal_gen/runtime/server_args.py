@@ -1113,11 +1113,18 @@ class ServerArgs(DisaggArgsMixin):
     def scheduler_endpoint(self):
         """
         Internal endpoint for scheduler.
-        Prefers the configured host but normalizes localhost -> 127.0.0.1 to avoid ZMQ issues.
+
+        This socket deserializes untrusted pickle payloads, so it must never be
+        exposed on a public interface (GHSA-gwv6-pq6m-p3rq). Wildcard/all-interface
+        hosts (``0.0.0.0`` / ``::``) are forced back to loopback even when the HTTP
+        server is bound to them; the scheduler client connects via this same
+        property, so both ends stay consistent.
         """
         scheduler_host = self.host
-        if scheduler_host is None or scheduler_host == "localhost":
+        if scheduler_host is None or scheduler_host in ("localhost", "0.0.0.0"):
             scheduler_host = "127.0.0.1"
+        elif scheduler_host == "::":
+            scheduler_host = "::1"
         return f"tcp://{scheduler_host}:{self.scheduler_port}"
 
     def settle_port(

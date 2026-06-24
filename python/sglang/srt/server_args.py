@@ -767,6 +767,9 @@ class ServerArgs:
         # Handle deprecated arguments.
         self._handle_deprecated_args()
 
+        # Warn about features that expand the remote attack surface.
+        self._warn_insecure_features()
+
         # Handle deprecated environment variables for prefill delayer.
         self._handle_prefill_delayer_env_compat()
 
@@ -976,6 +979,25 @@ class ServerArgs:
                         f"mm_process_config['{key}'] must be a dict, "
                         f"but got {type(self.mm_process_config[key])}"
                     )
+
+    def _warn_insecure_features(self):
+        # Custom logit processors are deserialized with dill and executed in the
+        # server process, i.e. arbitrary remote code execution by design
+        # (GHSA-36m8-w8qf-g76p). Only enable this on a fully trusted, authenticated
+        # deployment.
+        if self.enable_custom_logit_processor:
+            logger.warning(
+                "SECURITY: --enable-custom-logit-processor is set. The server will "
+                "deserialize and execute client-supplied callables (dill), which "
+                "allows remote code execution. Only enable this for fully trusted "
+                "clients, and protect every endpoint with --api-key."
+            )
+            if self.api_key is None:
+                logger.warning(
+                    "SECURITY: --enable-custom-logit-processor is enabled without "
+                    "--api-key; the code-execution endpoints are unauthenticated. "
+                    "Set --api-key (not only --admin-api-key) to require auth."
+                )
 
     def _handle_deprecated_args(self):
         # Handle deprecated tool call parsers
